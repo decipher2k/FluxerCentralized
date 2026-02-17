@@ -23,7 +23,6 @@ import {getCookie, setCookie, deleteCookie} from 'hono/cookie';
 import {SsoConfig} from './SsoConfig.js';
 import type {GlobalSessionStore} from './GlobalSessionStore.js';
 import type {SsoTokenService} from './SsoTokenService.js';
-import {Logger} from './Logger.js';
 
 const SSO_SESSION_COOKIE = '__flx_sso_session';
 
@@ -250,12 +249,12 @@ export function createSsoRoutes(
 
 	app.post('/token', async (ctx) => {
 		const body = await ctx.req.parseBody();
-		const grantType = body.grant_type as string;
+		const grantType = body['grant_type'] as string;
 
 		if (grantType === 'authorization_code') {
-			const code = body.code as string;
-			const codeVerifier = body.code_verifier as string;
-			const redirectUri = body.redirect_uri as string;
+			const code = body['code'] as string;
+			const codeVerifier = body['code_verifier'] as string;
+			const redirectUri = body['redirect_uri'] as string;
 
 			if (!code || !codeVerifier || !redirectUri) {
 				return ctx.json({error: 'invalid_request'}, 400);
@@ -309,7 +308,7 @@ export function createSsoRoutes(
 		}
 
 		if (grantType === 'refresh_token') {
-			const refreshToken = body.refresh_token as string;
+			const refreshToken = body['refresh_token'] as string;
 			if (!refreshToken) {
 				return ctx.json({error: 'invalid_request'}, 400);
 			}
@@ -384,7 +383,7 @@ export function createSsoRoutes(
 		}
 
 		const body = await ctx.req.parseBody();
-		const token = body.token as string;
+		const token = body['token'] as string;
 
 		if (!token) {
 			return ctx.json({active: false});
@@ -502,7 +501,7 @@ export function createSsoRoutes(
 
 	app.post('/revoke', async (ctx) => {
 		const body = await ctx.req.parseBody();
-		const token = body.token as string;
+		const token = body['token'] as string;
 
 		if (!token) {
 			return ctx.json({error: 'invalid_request'}, 400);

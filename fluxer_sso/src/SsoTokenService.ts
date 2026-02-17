@@ -50,8 +50,8 @@ export interface SsoRefreshTokenPayload {
 }
 
 export class SsoTokenService {
-	private privateKey!: jose.KeyLike;
-	private publicKey!: jose.KeyLike;
+	private privateKey!: jose.CryptoKey;
+	private publicKey!: jose.CryptoKey;
 
 	constructor(
 		private privateKeyPem: string,
@@ -127,7 +127,7 @@ export class SsoTokenService {
 				algorithms: ['RS256'],
 			});
 
-			if (payload.type !== 'access') return null;
+			if (payload['type'] !== 'access') return null;
 
 			return payload as unknown as SsoAccessTokenPayload;
 		} catch (error) {
@@ -146,7 +146,7 @@ export class SsoTokenService {
 				algorithms: ['RS256'],
 			});
 
-			if (payload.type !== 'refresh') return null;
+			if (payload['type'] !== 'refresh') return null;
 
 			return payload as unknown as SsoRefreshTokenPayload;
 		} catch (error) {

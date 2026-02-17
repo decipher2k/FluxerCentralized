@@ -33,5 +33,92 @@ Fluxer is an open-source, independent instant messaging and VoIP platform. Built
 
 ---
 
+## Architecture
+
+Fluxer is composed of several services, each responsible for a distinct part of the platform:
+
+| Service | Language | Description |
+|---|---|---|
+| **fluxer_api** | TypeScript | Core REST API server |
+| **fluxer_gateway** | Erlang | Real-time WebSocket gateway |
+| **fluxer_sso** | TypeScript | Centralized SSO & session management server |
+| **fluxer_app** | TypeScript | Desktop & web client (Electron + RSpack) |
+| **fluxer_admin** | Gleam | Admin panel |
+| **fluxer_media_proxy** | TypeScript | Media proxy & image processing |
+| **fluxer_metrics** | Rust | Metrics collection service |
+| **fluxer_marketing** | Gleam | Marketing site |
+| **fluxer_docs** | TypeScript | Documentation site (Next.js) |
+
+---
+
+## SSO / Session Server (`fluxer_sso`)
+
+The SSO server is a **centralized authentication and session management service** that provides single sign-on across all Fluxer instances. It acts as an **OAuth 2.0 / OpenID Connect-compatible authorization server** using the Authorization Code flow with PKCE (Proof Key for Code Exchange).
+
+### Key Features
+
+- **OAuth 2.0 + PKCE** — Secure browser-based authentication using the Authorization Code flow with S256 PKCE challenge method.
+- **OpenID Connect Discovery** — Full `/.well-known/openid-configuration` and `/.well-known/jwks.json` endpoints for automatic client and service configuration.
+- **Stateless Token Verification** — Access tokens are RS256-signed JWTs. API instances verify them locally using the public key from the JWKS endpoint — no round-trip to the SSO server needed.
+- **Global Session Management** — Sessions are stored in Redis/Valkey and shared across all API instances. Supports listing all active sessions, selective invalidation, and global logout.
+- **Refresh Token Rotation** — Single-use opaque refresh tokens with automatic rotation on each use, preventing replay attacks.
+- **Pub/Sub Event Broadcasting** — Session lifecycle events (`session-created`, `session-invalidated`, `global-logout`) are published via Redis pub/sub so all API instances can react in real time (e.g., clear local caches, disconnect WebSockets).
+- **Activity Tracking** — Session activity is tracked with configurable debouncing (default 5 min) to avoid write storms.
+- **Cookie-based SSO Sessions** — A secure, HttpOnly, SameSite cookie (`__flx_sso_session`) enables silent re-authentication across Fluxer applications.
+- **Token Introspection & Revocation** — Standard RFC 7662 introspection and RFC 7009 revocation endpoints for API instances.
+- **Inter-service Authentication** — Service-to-service calls are authenticated via a shared secret (`Authorization: Service <secret>`).
+
+### Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/.well-known/openid-configuration` | OpenID Connect discovery document |
+| GET | `/.well-known/jwks.json` | JSON Web Key Set (public key for JWT verification) |
+| GET | `/authorize` | OAuth 2.0 authorization (PKCE) |
+| POST | `/token` | Token exchange (auth code → tokens) and refresh token rotation |
+| GET | `/userinfo` | User identity claims (Bearer token) |
+| POST | `/introspect` | Token introspection (RFC 7662) |
+| POST | `/revoke` | Token revocation (RFC 7009) |
+| POST | `/session/create` | Create a global SSO session |
+| POST | `/session/validate` | Validate a session by token hash |
+| GET | `/session/list/:userId` | List all active sessions for a user |
+| POST | `/session/invalidate` | Invalidate specific sessions |
+| POST | `/session/invalidate-all` | Global logout (all sessions for a user) |
+| POST | `/session/set-cookie` | Set the SSO session cookie |
+| POST | `/logout` | Clear SSO cookie and optionally invalidate sessions |
+| GET | `/_health` | Health check |
+
+### Getting Started
+
+Generate the required RSA key pair and service secret:
+
+```sh
+cd fluxer_sso && pnpm generate-keys
+```
+
+This outputs an RSA-2048 key pair and a random service secret, ready to paste into your `.env` file.
+
+### Configuration
+
+All settings are configured via environment variables. Key options include:
+
+| Variable | Default | Description |
+|---|---|---|
+| `SSO_PORT` | `8090` | Server listen port |
+| `REDIS_URL` | — | Redis/Valkey connection URL |
+| `SSO_JWT_PRIVATE_KEY` | — | RSA private key (PEM) for signing tokens |
+| `SSO_JWT_PUBLIC_KEY` | — | RSA public key (PEM) for verification |
+| `SSO_SERVICE_SECRET` | — | Shared secret for inter-service auth |
+| `SSO_ACCESS_TOKEN_TTL` | `900` (15 min) | Access token lifetime in seconds |
+| `SSO_REFRESH_TOKEN_TTL` | `2592000` (30 days) | Refresh token lifetime in seconds |
+| `SSO_SESSION_TTL` | `2592000` (30 days) | Session TTL in seconds |
+| `SSO_ACTIVITY_UPDATE_INTERVAL` | `300` (5 min) | Debounce interval for activity tracking |
+| `SSO_ALLOWED_REDIRECT_URIS` | Auto-derived | Comma-separated allowed redirect URIs |
+| `SSO_COOKIE_DOMAIN` | `""` | Domain for the SSO cookie |
+
+See [`fluxer_sso/src/SsoConfig.ts`](fluxer_sso/src/SsoConfig.ts) for the full list of configuration options.
+
+---
+
 > [!NOTE]
 > Docs are coming very soon! With your help and [donations](https://fluxer.app/donate), the self-hosting and documentation story will get a lot better.

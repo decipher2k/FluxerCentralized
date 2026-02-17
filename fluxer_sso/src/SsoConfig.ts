@@ -19,7 +19,7 @@
 
 import process from 'node:process';
 
-interface SsoConfig {
+export interface SsoConfig {
 	port: number;
 	nodeEnv: 'development' | 'production';
 
@@ -160,5 +160,4 @@ function loadSsoConfig(): SsoConfig {
 	};
 }
 
-export const SsoConfig = loadSsoConfig();
-export type {SsoConfig};
+export const SsoConfig: SsoConfig = loadSsoConfig();
