@@ -1,0 +1,80 @@
+## Local test setup: SSO + 3 Fluxer API instances
+## Usage: docker compose --env-file dev/.env -f dev/compose.yaml -f dev/compose.local-test.yaml up -d sso api-1 api-2 api-3 postgres redis cassandra meilisearch minio minio-setup caddy
+
+services:
+  api-1:
+    image: node:24-bookworm-slim
+    working_dir: /workspace
+    command: bash -lc "corepack enable pnpm && CI=true pnpm install && npx tsx watch --clear-screen=false src/App.ts"
+    env_file:
+      - ./.env
+    environment:
+      - CI=true
+      - FLUXER_API_PORT=8080
+      - INSTANCE_ID=fluxer-1
+      - VAPID_PUBLIC_KEY=BJHAPp7Xg4oeN_D6-EVu0D-bDyPDwFFJiLn7CzkUjUvaG_F-keQGpA_-RiNugCosTPhhdvdrn4mEOh-_1Bt35V8
+      - FLUXER_METRICS_HOST=metrics:8080
+    volumes:
+      - ../fluxer_api:/workspace
+      - api1_node_modules:/workspace/node_modules
+    networks:
+      - fluxer-shared
+    restart: on-failure
+    depends_on:
+      - postgres
+      - redis
+      - cassandra
+      - sso
+
+  api-2:
+    image: node:24-bookworm-slim
+    working_dir: /workspace
+    command: bash -lc "corepack enable pnpm && CI=true pnpm install && npx tsx watch --clear-screen=false src/App.ts"
+    env_file:
+      - ./.env
+    environment:
+      - CI=true
+      - FLUXER_API_PORT=8081
+      - INSTANCE_ID=fluxer-2
+      - VAPID_PUBLIC_KEY=BJHAPp7Xg4oeN_D6-EVu0D-bDyPDwFFJiLn7CzkUjUvaG_F-keQGpA_-RiNugCosTPhhdvdrn4mEOh-_1Bt35V8
+      - FLUXER_METRICS_HOST=metrics:8080
+    volumes:
+      - ../fluxer_api:/workspace
+      - api2_node_modules:/workspace/node_modules
+    networks:
+      - fluxer-shared
+    restart: on-failure
+    depends_on:
+      - postgres
+      - redis
+      - cassandra
+      - sso
+
+  api-3:
+    image: node:24-bookworm-slim
+    working_dir: /workspace
+    command: bash -lc "corepack enable pnpm && CI=true pnpm install && npx tsx watch --clear-screen=false src/App.ts"
+    env_file:
+      - ./.env
+    environment:
+      - CI=true
+      - FLUXER_API_PORT=8082
+      - INSTANCE_ID=fluxer-3
+      - VAPID_PUBLIC_KEY=BJHAPp7Xg4oeN_D6-EVu0D-bDyPDwFFJiLn7CzkUjUvaG_F-keQGpA_-RiNugCosTPhhdvdrn4mEOh-_1Bt35V8
+      - FLUXER_METRICS_HOST=metrics:8080
+    volumes:
+      - ../fluxer_api:/workspace
+      - api3_node_modules:/workspace/node_modules
+    networks:
+      - fluxer-shared
+    restart: on-failure
+    depends_on:
+      - postgres
+      - redis
+      - cassandra
+      - sso
+
+volumes:
+  api1_node_modules:
+  api2_node_modules:
+  api3_node_modules:

@@ -120,5 +120,18 @@ See [`fluxer_sso/src/SsoConfig.ts`](fluxer_sso/src/SsoConfig.ts) for the full li
 
 ---
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [LOCAL_SETUP.md](LOCAL_SETUP.md) | Setting up a local development & test environment with Docker Compose |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Code of Conduct |
+| [SECURITY.md](SECURITY.md) | Security policy & vulnerability reporting |
+| [SECURITY_AUDIT.md](SECURITY_AUDIT.md) | SSO / Session Handling security audit |
+| [LICENSE.md](LICENSE.md) | License (AGPL-3.0) |
+
+---
+
 > [!NOTE]
 > Docs are coming very soon! With your help and [donations](https://fluxer.app/donate), the self-hosting and documentation story will get a lot better.
