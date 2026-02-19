@@ -124,11 +124,11 @@ See [`fluxer_sso/src/SsoConfig.ts`](fluxer_sso/src/SsoConfig.ts) for the full li
 
 | Document | Description |
 |----------|-------------|
-| [LOCAL_SETUP.md](LOCAL_SETUP.md) | Setting up a local development & test environment with Docker Compose |
+| [LOCAL_SETUP.md](LOCAL_SETUP.md) | Local development & test environment setup with Docker Compose |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Code of Conduct |
 | [SECURITY.md](SECURITY.md) | Security policy & vulnerability reporting |
-| [SECURITY_AUDIT.md](SECURITY_AUDIT.md) | SSO / Session Handling security audit |
+| [SECURITY_AUDIT.md](SECURITY_AUDIT.md) | SSO / session handling security audit |
 | [LICENSE.md](LICENSE.md) | License (AGPL-3.0) |
 
 ---

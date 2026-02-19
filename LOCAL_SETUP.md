@@ -1,25 +1,25 @@
-# Fluxer — Lokales Testsystem aufsetzen
+# Fluxer — Local Test System Setup
 
-Anleitung zum Einrichten einer vollständigen lokalen Entwicklungsumgebung mit Docker Compose.
-
----
-
-## Voraussetzungen
-
-| Tool | Min. Version | Hinweis |
-|------|-------------|---------|
-| **Docker** | 24+ | inkl. Docker Compose v2 (`docker compose`) |
-| **Node.js** | 24 LTS | Nur für lokale Skripte nötig; Container bringen eigene Runtime mit |
-| **pnpm** | 10.x | Wird in Containern automatisch via Corepack aktiviert |
-| **just** | 1.x | Task-Runner, optional aber empfohlen (`cargo install just` oder `brew install just`) |
-| **Rust** | nightly | Nur für `fluxer_metrics` und Cassandra-Migration-Tool |
-| **Erlang/OTP** | 28 | Nur wenn Gateway lokal (außerhalb Docker) gebaut wird |
-
-**Empfohlene Ressourcen:** Mindestens 8 GB RAM frei für alle Container.
+Guide for setting up a complete local development environment with Docker Compose.
 
 ---
 
-## 1. Repository klonen
+## Prerequisites
+
+| Tool | Min. Version | Notes |
+|------|-------------|-------|
+| **Docker** | 24+ | Including Docker Compose v2 (`docker compose`) |
+| **Node.js** | 24 LTS | Only needed for local scripts; containers bring their own runtime |
+| **pnpm** | 10.x | Automatically activated in containers via Corepack |
+| **just** | 1.x | Task runner, optional but recommended (`cargo install just` or `brew install just`) |
+| **Rust** | nightly | Only for `fluxer_metrics` and Cassandra migration tool |
+| **Erlang/OTP** | 28 | Only if building the gateway locally (outside Docker) |
+
+**Recommended resources:** At least 8 GB of free RAM for all containers.
+
+---
+
+## 1. Clone the Repository
 
 ```bash
 git clone <repository-url> FluxerCentralized
@@ -28,36 +28,36 @@ cd FluxerCentralized
 
 ---
 
-## 2. Environment-Datei einrichten
+## 2. Set Up the Environment File
 
 ```bash
 cp dev/.env.example dev/.env
 ```
 
-Die `.env.example` enthält bereits funktionsfähige Defaults für lokale Entwicklung. Folgende Werte müssen ggf. angepasst werden:
+The `.env.example` already contains working defaults for local development. The following values may need to be adjusted:
 
-| Variable | Standard | Beschreibung |
-|----------|----------|-------------|
-| `DATABASE_URL` | `postgresql://postgres:postgres@postgres:5432/fluxer` | PostgreSQL-Verbindung |
-| `REDIS_URL` | `redis://redis:6379` | Valkey/Redis-Verbindung |
-| `CASSANDRA_HOSTS` | `cassandra` | ScyllaDB-Host |
-| `MEILISEARCH_API_KEY` | `masterKey` | Meilisearch Master-Key |
-| `AWS_S3_ENDPOINT` | `http://minio:9000` | Lokaler MinIO S3-Endpoint |
-| `SSO_ENABLED` | `false` | SSO aktivieren (siehe Abschnitt 7) |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `postgresql://postgres:postgres@postgres:5432/fluxer` | PostgreSQL connection |
+| `REDIS_URL` | `redis://redis:6379` | Valkey/Redis connection |
+| `CASSANDRA_HOSTS` | `cassandra` | ScyllaDB host |
+| `MEILISEARCH_API_KEY` | `masterKey` | Meilisearch master key |
+| `AWS_S3_ENDPOINT` | `http://minio:9000` | Local MinIO S3 endpoint |
+| `SSO_ENABLED` | `false` | Enable SSO (see section 7) |
 
-> **Hinweis:** Alle Hostnamen (`postgres`, `redis`, `cassandra`, etc.) verweisen auf Docker-Service-Namen im gemeinsamen Netzwerk `fluxer-shared`.
+> **Note:** All hostnames (`postgres`, `redis`, `cassandra`, etc.) refer to Docker service names within the shared `fluxer-shared` network.
 
 ---
 
-## 3. Docker-Netzwerk erstellen
+## 3. Create the Docker Network
 
-Alle Services teilen sich ein externes Docker-Netzwerk:
+All services share an external Docker network:
 
 ```bash
 docker network create fluxer-shared
 ```
 
-Oder via `just`:
+Or via `just`:
 
 ```bash
 just ensure-network
@@ -65,47 +65,47 @@ just ensure-network
 
 ---
 
-## 4. Services starten
+## 4. Start Services
 
-### Variante A: Mit `just` (empfohlen)
+### Option A: Using `just` (recommended)
 
 ```bash
-# Ersteinrichtung (erstellt .env, Netzwerk, LiveKit-Config)
+# Initial setup (creates .env, network, LiveKit config)
 just setup
 
-# Datenbank-Services starten
+# Start database services
 just up postgres redis cassandra meilisearch minio minio-setup
 
-# Cassandra-Migration ausführen (benötigt vorher gebautes Migration-Tool)
+# Run Cassandra migrations (requires pre-built migration tool)
 just mig-up cassandra cassandra cassandra
 
-# Alle Anwendungs-Services starten
+# Start all application services
 just up api worker media gateway caddy
 ```
 
-### Variante B: Direkt mit Docker Compose
+### Option B: Directly with Docker Compose
 
 ```bash
-# Datenbank-Services
+# Database services
 docker compose --env-file dev/.env -f dev/compose.yaml up -d \
   postgres redis cassandra meilisearch minio minio-setup
 
-# Warten bis Cassandra gesund ist (~90s)
+# Wait for Cassandra to become healthy (~90s)
 docker compose --env-file dev/.env -f dev/compose.yaml ps
 
-# Anwendungs-Services
+# Application services
 docker compose --env-file dev/.env -f dev/compose.yaml up -d \
   api worker media gateway caddy
 ```
 
 ---
 
-## 5. Service-Übersicht
+## 5. Service Overview
 
-Alle Services sind über den **Caddy Reverse Proxy** auf Port `8088` erreichbar:
+All services are accessible through the **Caddy reverse proxy** on port `8088`:
 
-| Service | Interner Port | URL (via Caddy) | Technologie |
-|---------|--------------|-----------------|-------------|
+| Service | Internal Port | URL (via Caddy) | Technology |
+|---------|--------------|-----------------|------------|
 | **Caddy** (Reverse Proxy) | 8088 | `http://localhost:8088` | Caddy 2 |
 | **API** | 8080 | `http://localhost:8088/api/` | Node.js / Hono |
 | **Worker** | — | — (Background) | Node.js |
@@ -117,36 +117,36 @@ Alle Services sind über den **Caddy Reverse Proxy** auf Port `8088` erreichbar:
 | **Metrics** | 8080 | `http://localhost:8088/metrics/` | Rust |
 | **Docs** | 3000 | — | Next.js |
 
-### Datenbank-Services (nicht über Caddy exponiert)
+### Database Services (not exposed via Caddy)
 
-| Service | Port | Zugangsdaten |
+| Service | Port | Credentials |
 |---------|------|-------------|
-| **PostgreSQL** | 5432 (intern) | `postgres` / `postgres` / DB: `fluxer` |
+| **PostgreSQL** | 5432 (internal) | `postgres` / `postgres` / DB: `fluxer` |
 | **ScyllaDB** (Cassandra) | 9042 | `cassandra` / `cassandra` |
-| **Valkey** (Redis) | 6379 (intern) | Kein Passwort |
-| **MinIO** (S3) | 9000/9001 (intern) | `minioadmin` / `minioadmin` |
-| **MeiliSearch** | 7700 (intern) | Key: `masterKey` |
-| **ClamAV** | 3310 (intern) | — |
-| **ClickHouse** | 8123/9000 | `fluxer` / `fluxer_dev` (Profil `clickhouse`) |
+| **Valkey** (Redis) | 6379 (internal) | No password |
+| **MinIO** (S3) | 9000/9001 (internal) | `minioadmin` / `minioadmin` |
+| **MeiliSearch** | 7700 (internal) | Key: `masterKey` |
+| **ClamAV** | 3310 (internal) | — |
+| **ClickHouse** | 8123/9000 | `fluxer` / `fluxer_dev` (profile `clickhouse`) |
 
 ---
 
-## 6. Cassandra-Migrationen
+## 6. Cassandra Migrations
 
-Das Migrations-Tool muss einmalig kompiliert werden:
+The migration tool must be compiled once:
 
 ```bash
-# Migrations-Tool bauen
+# Build migration tool
 cargo build --release --manifest-path scripts/cassandra-migrate/Cargo.toml
 
-# Migrationen ausführen (gegen lokale Cassandra)
+# Run migrations (against local Cassandra)
 just mig-up
 
-# Oder direkt via Docker:
+# Or directly via Docker:
 docker compose --env-file dev/.env -f dev/compose.yaml up cassandra-migrate
 ```
 
-Neue Migration erstellen:
+Create a new migration:
 
 ```bash
 just mig "add_some_table"
@@ -154,11 +154,11 @@ just mig "add_some_table"
 
 ---
 
-## 7. SSO aktivieren (optional)
+## 7. Enable SSO (Optional)
 
-Für Cross-Instance-Session-Management:
+For cross-instance session management:
 
-### 7.1 JWT-Keys generieren
+### 7.1 Generate JWT Keys
 
 ```bash
 cd fluxer_sso
@@ -166,28 +166,28 @@ pnpm install
 pnpm generate-keys
 ```
 
-### 7.2 Keys in `dev/.env` eintragen
+### 7.2 Add Keys to `dev/.env`
 
 ```dotenv
 SSO_ENABLED=true
-SSO_JWT_PRIVATE_KEY=<generierter Private Key>
-SSO_JWT_PUBLIC_KEY=<generierter Public Key>
+SSO_JWT_PRIVATE_KEY=<generated private key>
+SSO_JWT_PUBLIC_KEY=<generated public key>
 SSO_SERVICE_SECRET=dev-sso-secret-change-in-production
 ```
 
-### 7.3 SSO-Server starten
+### 7.3 Start the SSO Server
 
 ```bash
 just up sso
-# oder
+# or
 docker compose --env-file dev/.env -f dev/compose.yaml up -d sso
 ```
 
 ---
 
-## 8. Multi-Instance-Test (SSO mit 3 API-Instanzen)
+## 8. Multi-Instance Test (SSO with 3 API Instances)
 
-Für Tests mit mehreren API-Instanzen existiert eine spezielle Compose-Datei:
+A dedicated Compose file exists for testing with multiple API instances:
 
 ```bash
 docker compose --env-file dev/.env \
@@ -196,13 +196,13 @@ docker compose --env-file dev/.env \
   up -d sso api-1 api-2 api-3 postgres redis cassandra meilisearch minio minio-setup caddy
 ```
 
-Dies startet 3 API-Instanzen (`fluxer-1`, `fluxer-2`, `fluxer-3`) auf den Ports 8080, 8081, 8082 — alle über den SSO-Server für globale Session-Verwaltung verbunden.
+This starts 3 API instances (`fluxer-1`, `fluxer-2`, `fluxer-3`) on ports 8080, 8081, 8082 — all connected via the SSO server for global session management.
 
 ---
 
-## 9. Optionale Services
+## 9. Optional Services
 
-### ClickHouse (Metriken-Persistierung)
+### ClickHouse (Metrics Persistence)
 
 ```bash
 docker compose --env-file dev/.env -f dev/compose.yaml --profile clickhouse up -d clickhouse metrics-clickhouse
@@ -211,30 +211,30 @@ docker compose --env-file dev/.env -f dev/compose.yaml --profile clickhouse up -
 ### LiveKit (Voice/Video)
 
 ```bash
-# LiveKit-Config generieren
+# Generate LiveKit config
 just livekit-sync
 
-# LiveKit starten
+# Start LiveKit
 just up livekit
 ```
 
 Ports: `7880` (HTTP), `7882/udp`, `7999/udp`
 
-### ClamAV (Virenscanner)
+### ClamAV (Virus Scanner)
 
 ```bash
 just up clamav
 ```
 
-In `dev/.env` aktivieren:
+Enable in `dev/.env`:
 
 ```dotenv
 CLAMAV_ENABLED=true
 ```
 
-> **Hinweis:** ClamAV benötigt ~5 Minuten für den ersten Start (Signaturen-Download).
+> **Note:** ClamAV requires ~5 minutes for the initial start (signature download).
 
-### Docs (Dokumentation)
+### Docs (Documentation)
 
 ```bash
 just up docs
@@ -242,34 +242,34 @@ just up docs
 
 ---
 
-## 10. Nützliche Befehle
+## 10. Useful Commands
 
 ```bash
-# Logs verfolgen
+# Follow logs
 just logs api worker gateway
 
-# In Container-Shell einsteigen
+# Enter a container shell
 just sh api bash
 
-# Alle Services stoppen
+# Stop all services
 just down
 
-# Alle Services + Volumes löschen (Datenverlust!)
+# Stop all services and delete volumes (data loss!)
 just nuke
 
-# Status aller Container
+# Check status of all containers
 just ps
 
-# Service neustarten
+# Restart a service
 just restart api
 
-# Watch-Mode (automatischer Rebuild bei Code-Änderungen)
+# Watch mode (automatic rebuild on code changes)
 just watch admin marketing
 ```
 
 ---
 
-## 11. Architektur-Diagramm
+## 11. Architecture Diagram
 
 ```
                           ┌──────────────────────┐
@@ -294,13 +294,13 @@ just watch admin marketing
 
 ## 12. Troubleshooting
 
-| Problem | Lösung |
-|---------|--------|
-| `network fluxer-shared not found` | `docker network create fluxer-shared` oder `just ensure-network` |
-| Cassandra startet nicht | Braucht ~90s bis Healthy. Check: `docker compose ... ps` |
-| API kann DB nicht erreichen | Prüfen ob PostgreSQL läuft: `just logs postgres` |
-| `pnpm: not found` im Container | Corepack muss aktiviert sein — passiert automatisch via `command` |
-| MinIO-Buckets fehlen | `minio-setup` Service starten: `just up minio minio-setup` |
-| Port 8088 bereits belegt | Anderen Port in `dev/Caddyfile.dev` und `dev/.env` konfigurieren |
-| ClamAV Healthcheck failed | Erster Start dauert ~5 Min (Signaturen). Warten oder `CLAMAV_ENABLED=false` |
-| SSO-Tokens ungültig | JWT-Keys mit `pnpm generate-keys` neu generieren und in `.env` eintragen |
+| Problem | Solution |
+|---------|----------|
+| `network fluxer-shared not found` | `docker network create fluxer-shared` or `just ensure-network` |
+| Cassandra won't start | Needs ~90s to become healthy. Check: `docker compose ... ps` |
+| API can't reach DB | Verify PostgreSQL is running: `just logs postgres` |
+| `pnpm: not found` in container | Corepack must be enabled — happens automatically via `command` |
+| MinIO buckets missing | Start `minio-setup` service: `just up minio minio-setup` |
+| Port 8088 already in use | Configure a different port in `dev/Caddyfile.dev` and `dev/.env` |
+| ClamAV healthcheck failed | Initial start takes ~5 min (signatures). Wait or set `CLAMAV_ENABLED=false` |
+| SSO tokens invalid | Regenerate JWT keys with `pnpm generate-keys` and update `.env` |

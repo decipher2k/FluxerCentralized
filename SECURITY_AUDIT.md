@@ -1,49 +1,49 @@
 # Fluxer SSO / Session Handling — Security Audit
 
-**Datum:** 19. Februar 2026  
+**Date:** February 19, 2026  
 **Scope:** `fluxer_sso/`, `fluxer_api/src/auth/`, `fluxer_api/src/middleware/`, `fluxer_api/src/sso/`
 
 ---
 
-## Gesamtbewertung
+## Overall Assessment
 
-**Die SSO- und Session-Architektur ist solide und folgt modernen Best Practices.**  
-Keine kritischen Schwachstellen gefunden. Die nachfolgenden Punkte sind Härtungsmaßnahmen.
+**The SSO and session architecture is solid and follows modern best practices.**  
+No critical vulnerabilities found. The findings below are hardening recommendations.
 
 ---
 
-## Stärken
+## Strengths
 
-| Bereich                          | Umsetzung                                                                                          |
+| Area                             | Implementation                                                                                      |
 | -------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **Token-Signierung**             | RS256 (asymmetrisch) — API-Instanzen verifizieren JWTs lokal via Public Key, kein SSO-Round-Trip    |
-| **PKCE**                         | Nur S256 erlaubt, kein Plain-Mode — schützt gegen Authorization Code Interception                   |
-| **Auth-Code**                    | Einmalverwendung (sofort gelöscht nach Konsum), 5 Min TTL                                           |
-| **Refresh Token Rotation**       | Alter Token wird bei jedem Refresh konsumiert, neuer ausgegeben — schützt bei Token-Leak            |
-| **Session-Token-Speicherung**    | Nur SHA-256-Hash wird in DB gespeichert, nie das Token selbst                                       |
-| **Cookie-Sicherheit**            | `httpOnly: true`, `secure: true` (Production), `sameSite: Lax` auf allen sicherheitsrelevanten Cookies |
-| **Sudo-Mode**                    | HS256-JWT, 5 Min Lebensdauer, user-gebunden, Algorithm-Pinning verhindert Algorithm-Confusion       |
-| **MFA**                          | TOTP, SMS, WebAuthn + Backup-Codes unterstützt                                                      |
-| **Globale Session-Invalidierung**| Redis Pub/Sub notifiziert alle API-Instanzen bei Logout/Revocation                                  |
-| **Rate Limiting**                | Per-Bucket + globale Limits auf allen Auth-Endpoints (Register, Login, MFA, Forgot Password)        |
-| **Captcha**                      | hCaptcha / Cloudflare Turnstile auf Register, Login, Forgot Password                                |
-| **JWKS / OpenID Discovery**      | Standard-Endpunkte (`/.well-known/jwks.json`, `/.well-known/openid-configuration`) vorhanden        |
-| **Token Introspection**          | Prüft ob Session im globalen Store noch aktiv ist                                                   |
-| **Revocation**                   | RFC 7009 konform (immer Success, auch wenn Token bereits ungültig)                                  |
+| **Token Signing**                | RS256 (asymmetric) — API instances verify JWTs locally via public key, no SSO round-trip required    |
+| **PKCE**                         | Only S256 allowed, no plain mode — protects against authorization code interception                  |
+| **Auth Code**                    | Single-use (deleted immediately after consumption), 5 min TTL                                       |
+| **Refresh Token Rotation**       | Old token is consumed on each refresh, new one issued — protects against token leaks                 |
+| **Session Token Storage**        | Only SHA-256 hash is stored in DB, never the token itself                                           |
+| **Cookie Security**              | `httpOnly: true`, `secure: true` (production), `sameSite: Lax` on all security-relevant cookies     |
+| **Sudo Mode**                    | HS256 JWT, 5 min lifetime, user-bound, algorithm pinning prevents algorithm confusion                |
+| **MFA**                          | TOTP, SMS, WebAuthn + backup codes supported                                                        |
+| **Global Session Invalidation**  | Redis Pub/Sub notifies all API instances on logout/revocation                                       |
+| **Rate Limiting**                | Per-bucket + global limits on all auth endpoints (register, login, MFA, forgot password)             |
+| **Captcha**                      | hCaptcha / Cloudflare Turnstile on register, login, forgot password                                 |
+| **JWKS / OpenID Discovery**      | Standard endpoints (`/.well-known/jwks.json`, `/.well-known/openid-configuration`) present          |
+| **Token Introspection**          | Verifies whether the session is still active in the global store                                    |
+| **Revocation**                   | RFC 7009 compliant (always returns success, even if the token is already invalid)                    |
 
 ---
 
 ## Findings
 
-### 1. Service-Secret-Vergleich anfällig für Timing-Angriff
+### 1. Service Secret Comparison Vulnerable to Timing Attack
 
 | | |
 |---|---|
-| **Schwere** | Mittel |
-| **Datei** | `fluxer_sso/src/SsoRoutes.ts` — `verifyServiceAuth()` |
-| **Problem** | String-Vergleich mit `===` statt `crypto.timingSafeEqual`. Ermöglicht theoretisch einen Timing-Seitenkanalangriff auf das Inter-Service-Secret. |
+| **Severity** | Medium |
+| **File** | `fluxer_sso/src/SsoRoutes.ts` — `verifyServiceAuth()` |
+| **Issue** | String comparison uses `===` instead of `crypto.timingSafeEqual`. This theoretically enables a timing side-channel attack on the inter-service secret. |
 
-**Empfohlener Fix:**
+**Recommended Fix:**
 
 ```typescript
 function verifyServiceAuth(authHeader: string | undefined): boolean {
@@ -56,63 +56,63 @@ function verifyServiceAuth(authHeader: string | undefined): boolean {
 
 ---
 
-### 2. SSO-Sync ist fire-and-forget (Eventually Consistent)
+### 2. SSO Sync is Fire-and-Forget (Eventually Consistent)
 
 | | |
 |---|---|
-| **Schwere** | Mittel |
-| **Datei** | `fluxer_api/src/auth/services/AuthSessionService.ts` |
-| **Problem** | `syncSessionToSso()`, `invalidateSessionInSso()` und `invalidateAllUserSessionsInSso()` werden mit `void` aufgerufen (kein `await`). Bei SSO-Server-Ausfall bleibt die lokale Session gültig, und eine im SSO revozierte Session kann lokal weiterleben bis sie eigenständig abläuft. |
+| **Severity** | Medium |
+| **File** | `fluxer_api/src/auth/services/AuthSessionService.ts` |
+| **Issue** | `syncSessionToSso()`, `invalidateSessionInSso()`, and `invalidateAllUserSessionsInSso()` are called with `void` (no `await`). If the SSO server is down, the local session remains valid, and a session revoked in SSO can continue to work locally until it expires independently. |
 
-**Empfehlung:** Bewusste Design-Entscheidung (Verfügbarkeit > Konsistenz), sollte aber dokumentiert werden. Optional: Retry-Mechanismus mit exponential Backoff einbauen.
+**Recommendation:** This is a deliberate design decision (availability > consistency), but it should be documented. Optionally, implement a retry mechanism with exponential backoff.
 
 ---
 
-### 3. Wildcard-Redirect-URIs ermöglichen potenziell Open-Redirect
+### 3. Wildcard Redirect URIs May Enable Open Redirect
 
 | | |
 |---|---|
-| **Schwere** | Mittel-Niedrig |
-| **Datei** | `fluxer_sso/src/SsoRoutes.ts` — `isRedirectUriAllowed()` |
-| **Problem** | Redirect-URI-Validierung erlaubt Wildcards (`endsWith('*')`). Zu breit konfigurierte Wildcards (z.B. `https://example.com/*`) könnten als Open-Redirect missbraucht werden. |
+| **Severity** | Medium-Low |
+| **File** | `fluxer_sso/src/SsoRoutes.ts` — `isRedirectUriAllowed()` |
+| **Issue** | Redirect URI validation allows wildcards (`endsWith('*')`). Overly broad wildcards (e.g., `https://example.com/*`) could be exploited as an open redirect. |
 
-**Empfehlung:** Nur exakte Matches oder streng begrenzte Prefix-Matches erlauben. Wildcard-Feature dokumentieren und in Production die konfigurierte Liste auditieren.
+**Recommendation:** Allow only exact matches or strictly bounded prefix matches. Document the wildcard feature and audit the configured list in production.
 
 ---
 
-### 4. Rate Limits im Testmodus deaktiviert
+### 4. Rate Limits Disabled in Test Mode
 
 | | |
 |---|---|
-| **Schwere** | Mittel |
-| **Datei** | `fluxer_api/src/middleware/RateLimitMiddleware.ts` |
-| **Problem** | Wenn `testModeEnabled` aktiv ist, werden sämtliche Rate Limits übersprungen. Dieses Flag darf in Production nie aktiv sein. |
+| **Severity** | Medium |
+| **File** | `fluxer_api/src/middleware/RateLimitMiddleware.ts` |
+| **Issue** | When `testModeEnabled` is active, all rate limits are bypassed. This flag must never be active in production. |
 
-**Empfehlung:** CI/CD-Check einbauen, der sicherstellt, dass `testModeEnabled` in Production-Deployments immer `false` ist.
+**Recommendation:** Add a CI/CD check to ensure `testModeEnabled` is always `false` in production deployments.
 
 ---
 
-### 5. X-Forwarded-For wird direkt vertraut
+### 5. X-Forwarded-For Trusted Directly
 
 | | |
 |---|---|
-| **Schwere** | Niedrig |
-| **Datei** | `fluxer_api/src/sso/SsoSessionSync.ts` |
-| **Problem** | Client-IP wird aus `X-Forwarded-For` extrahiert, ohne dass der Header auf Proxy-Ebene validiert wird. Sicherheit hängt vollständig von der korrekten Caddy-Konfiguration ab. |
+| **Severity** | Low |
+| **File** | `fluxer_api/src/sso/SsoSessionSync.ts` |
+| **Issue** | Client IP is extracted from `X-Forwarded-For` without proxy-level validation. Security depends entirely on correct Caddy configuration. |
 
-**Empfehlung:** Sicherstellen, dass der Reverse Proxy (Caddy) `X-Forwarded-For` überschreibt und nicht an Client-gesetzte Werte anhängt.
+**Recommendation:** Ensure the reverse proxy (Caddy) overwrites `X-Forwarded-For` rather than appending to client-set values.
 
 ---
 
-### 6. Keine Token-Längenprüfung vor Hash-Berechnung
+### 6. No Token Length Validation Before Hashing
 
 | | |
 |---|---|
-| **Schwere** | Niedrig |
-| **Datei** | `fluxer_api/src/middleware/UserMiddleware.ts` |
-| **Problem** | Tokens beliebiger Länge werden direkt gehasht und in der DB nachgeschlagen. Extrem lange Tokens verursachen unnötige Crypto- und DB-Arbeit. |
+| **Severity** | Low |
+| **File** | `fluxer_api/src/middleware/UserMiddleware.ts` |
+| **Issue** | Tokens of arbitrary length are hashed directly and looked up in the DB. Extremely long tokens cause unnecessary crypto and DB work. |
 
-**Empfehlung:** Einfache Format-Validierung vor Hash-Berechnung (`flx_` Prefix + exakt 36 Zeichen):
+**Recommendation:** Add simple format validation before hashing (`flx_` prefix + exactly 36 characters):
 
 ```typescript
 if (!token.startsWith('flx_') || token.length !== 40) return null;
@@ -120,15 +120,15 @@ if (!token.startsWith('flx_') || token.length !== 40) return null;
 
 ---
 
-## Zusammenfassung
+## Summary
 
-| # | Finding                                    | Schwere       | Status       |
-|---|--------------------------------------------|---------------|--------------|
-| 1 | Timing-unsicherer Service-Secret-Vergleich | Mittel        | Offen        |
-| 2 | Fire-and-forget SSO-Sync                   | Mittel        | Design-Entscheidung |
-| 3 | Wildcard-Redirect-URIs                     | Mittel-Niedrig| Offen        |
-| 4 | Rate Limits in Testmodus deaktiviert       | Mittel        | Prüfen       |
-| 5 | X-Forwarded-For ohne Proxy-Validierung     | Niedrig       | Prüfen       |
-| 6 | Keine Token-Längenprüfung                  | Niedrig       | Offen        |
+| # | Finding                                    | Severity      | Status              |
+|---|--------------------------------------------|---------------|---------------------|
+| 1 | Timing-unsafe service secret comparison    | Medium        | Open                |
+| 2 | Fire-and-forget SSO sync                   | Medium        | Design decision     |
+| 3 | Wildcard redirect URIs                     | Medium-Low    | Open                |
+| 4 | Rate limits disabled in test mode          | Medium        | Needs verification  |
+| 5 | X-Forwarded-For without proxy validation   | Low           | Needs verification  |
+| 6 | No token length validation                 | Low           | Open                |
 
-**Priorität:** Finding #1 (Timing-Safe Comparison) ist ein Einzeiler-Fix und sollte zuerst umgesetzt werden.
+**Priority:** Finding #1 (timing-safe comparison) is a one-liner fix and should be addressed first.
