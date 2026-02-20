@@ -30,6 +30,7 @@ import type {
 import {AuthEmailRevertService} from '~/auth/services/AuthEmailRevertService';
 import {AuthEmailService} from '~/auth/services/AuthEmailService';
 import {AuthLoginService} from '~/auth/services/AuthLoginService';
+import {AccountLockoutService} from '~/auth/services/AccountLockoutService';
 import {AuthMfaService} from '~/auth/services/AuthMfaService';
 import {AuthPasswordService} from '~/auth/services/AuthPasswordService';
 import {AuthPhoneService} from '~/auth/services/AuthPhoneService';
@@ -221,6 +222,7 @@ export class AuthService implements IAuthService {
 			rateLimitService,
 			emailServiceDep,
 			redisAccountDeletionQueue,
+			new AccountLockoutService(cacheService),
 			this.passwordService.verifyPassword.bind(this.passwordService),
 			this.utilityService.handleBanStatus.bind(this.utilityService),
 			this.utilityService.assertNonBotUser.bind(this.utilityService),

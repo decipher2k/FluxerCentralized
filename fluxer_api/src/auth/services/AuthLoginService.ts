@@ -18,6 +18,7 @@
  */
 
 import type {AuthenticationResponseJSON} from '@simplewebauthn/server';
+import type {AccountLockoutService} from '~/auth/services/AccountLockoutService';
 import type {LoginRequest} from '~/auth/AuthModel';
 import type {UserID} from '~/BrandedTypes';
 import {
@@ -29,7 +30,7 @@ import {
 } from '~/BrandedTypes';
 import {Config} from '~/Config';
 import {APIErrorCodes, UserAuthenticatorTypes, UserFlags} from '~/Constants';
-import {FluxerAPIError, InputValidationError} from '~/Errors';
+import {AccountLockedError, FluxerAPIError, InputValidationError} from '~/Errors';
 import type {ICacheService} from '~/infrastructure/ICacheService';
 import type {IEmailService} from '~/infrastructure/IEmailService';
 import type {IRateLimitService} from '~/infrastructure/IRateLimitService';
@@ -83,6 +84,7 @@ export class AuthLoginService {
 		private rateLimitService: IRateLimitService,
 		private emailService: IEmailService,
 		private redisDeletionQueue: RedisAccountDeletionQueueService,
+		private accountLockoutService: AccountLockoutService,
 		private verifyPassword: (params: {password: string; passwordHash: string}) => Promise<boolean>,
 		private handleBanStatus: (user: User) => Promise<User>,
 		private assertNonBotUser: (user: User) => void,
@@ -230,6 +232,13 @@ export class AuthLoginService {
 		const inTests = Config.dev.testModeEnabled || process.env.CI === 'true';
 		const skipRateLimits = inTests || Config.dev.disableRateLimits;
 
+		if (!skipRateLimits) {
+			const lockout = await this.accountLockoutService.checkLockout(data.email);
+			if (lockout.locked) {
+				throw new AccountLockedError(lockout.retryAfterSeconds);
+			}
+		}
+
 		const emailRateLimit = await this.rateLimitService.checkLimit({
 			identifier: `login:email:${data.email}`,
 			maxAttempts: 5,
@@ -261,6 +270,7 @@ export class AuthLoginService {
 
 		const user = await this.repository.findByEmail(data.email);
 		if (!user) {
+			await this.accountLockoutService.recordFailedAttempt(data.email);
 			getMetricsService().counter({
 				name: 'auth.login.failure',
 				dimensions: {reason: 'invalid_credentials'},
@@ -279,6 +289,7 @@ export class AuthLoginService {
 		});
 
 		if (!isMatch) {
+			await this.accountLockoutService.recordFailedAttempt(data.email);
 			getMetricsService().counter({
 				name: 'auth.login.failure',
 				dimensions: {reason: 'invalid_credentials'},
@@ -380,6 +391,9 @@ export class AuthLoginService {
 		}
 
 		if (hasMfa) {
+			// Password is valid; reset lockout before entering MFA flow.
+			// MFA failures are tracked separately via MFA rate limits.
+			await this.accountLockoutService.resetLockout(data.email);
 			return await this.createMfaTicketResponse(currentUser);
 		}
 
@@ -394,6 +408,8 @@ export class AuthLoginService {
 				Logger.warn({inviteCode: data.invite_code, error}, 'Failed to auto-join invite on login');
 			}
 		}
+
+		await this.accountLockoutService.resetLockout(data.email);
 
 		const [token] = await this.createAuthSession({user: currentUser, request});
 		const isPendingVerification = (currentUser.flags & UserFlags.PENDING_MANUAL_VERIFICATION) !== 0n;

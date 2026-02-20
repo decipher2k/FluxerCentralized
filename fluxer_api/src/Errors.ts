@@ -18,6 +18,7 @@
  */
 
 export * from './errors/AccessDeniedError';
+export * from './errors/AccountLockedError';
 export * from './errors/AccountSuspiciousActivityError';
 export * from './errors/AclsMustBeNonEmptyError';
 export * from './errors/AlreadyFriendsError';
