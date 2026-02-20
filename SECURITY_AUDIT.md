@@ -27,6 +27,7 @@ No critical vulnerabilities found. The findings below are hardening recommendati
 | **Global Session Invalidation**  | Redis Pub/Sub notifies all API instances on logout/revocation                                       |
 | **Rate Limiting**                | Per-bucket + global limits on all auth endpoints (register, login, MFA, forgot password)             |
 | **Captcha**                      | hCaptcha / Cloudflare Turnstile on register, login, forgot password                                 |
+| **Account Lockout**              | Escalating lockout per email: 5 failures → 15 min, 10 → 1 h, 20 → 24 h — mitigates distributed brute-force |
 | **JWKS / OpenID Discovery**      | Standard endpoints (`/.well-known/jwks.json`, `/.well-known/openid-configuration`) present          |
 | **Token Introspection**          | Verifies whether the session is still active in the global store                                    |
 | **Revocation**                   | RFC 7009 compliant (always returns success, even if the token is already invalid)                    |
